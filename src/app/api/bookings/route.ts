@@ -12,10 +12,6 @@ interface CleanerRow {
   status: string
 }
 
-interface ConflictRow {
-  id: string
-}
-
 interface BookingRow {
   id: string
 }
@@ -67,29 +63,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '清潔師不存在或未通過審核' }, { status: 404 })
   }
 
-  // Check for scheduling conflicts
-  const { data: rawConflicts } = await sb
-    .from('bookings')
-    .select('id')
-    .eq('cleaner_id', cleanerId)
-    .eq('scheduled_date', scheduledDate)
-    .not('status', 'in', '("cancelled","disputed")')
-
-  const conflicts = rawConflicts as ConflictRow[] | null
-
-  if (conflicts && conflicts.length > 0) {
-    return NextResponse.json({ error: '該清潔師在此日期已有預約' }, { status: 409 })
-  }
-
   const totalAmount = service.price_per_session
   const { platformCommission, cleanerPayout, commissionRate } = calculateFinancials(totalAmount)
 
-  // Calculate end time
+  // Calculate end time (must be done before conflict check)
   const [hours, minutes] = scheduledStartTime.split(':').map(Number)
   const endMinutes = hours * 60 + minutes + Math.round(service.duration_hours * 60)
   const endHour = Math.floor(endMinutes / 60)
   const endMin = endMinutes % 60
   const scheduledEndTime = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
+
+  // Check for scheduling conflicts — compare actual time ranges, not just dates
+  const { data: rawConflicts } = await sb
+    .from('bookings')
+    .select('id, scheduled_start_time, scheduled_end_time')
+    .eq('cleaner_id', cleanerId)
+    .eq('scheduled_date', scheduledDate)
+    .not('status', 'in', '("cancelled","disputed")')
+
+  interface TimeSlot { scheduled_start_time: string; scheduled_end_time: string }
+  const hasConflict = (rawConflicts as TimeSlot[] | null)?.some((b) => {
+    // Overlap: new start < existing end AND new end > existing start
+    return scheduledStartTime < b.scheduled_end_time && scheduledEndTime > b.scheduled_start_time
+  })
+
+  if (hasConflict) {
+    return NextResponse.json({ error: '該清潔師在此時段已有預約，請選擇其他時間' }, { status: 409 })
+  }
 
   const bookingNumber = generateBookingNumber()
 

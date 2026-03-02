@@ -5,6 +5,16 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Get user role to show appropriate nav items
+  let userRole: string | null = null
+  if (user) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: profile } = await (supabase as any).from('profiles').select('role').eq('id', user.id).single()
+    userRole = profile?.role || null
+  }
+
+  const isCleaner = userRole === 'cleaner'
+
   return (
     <div className="min-h-screen bg-[#F8F9F6]">
       {/* Navbar */}
@@ -25,18 +35,21 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                <Link
-                  href="/account/bookings"
-                  className="text-sm text-[#6B7280] hover:text-[#1A1A1A] px-3 py-1.5 hidden sm:inline-flex"
-                >
-                  我的預約
-                </Link>
-                <Link
-                  href="/provider/dashboard"
-                  className="text-sm px-4 py-2 bg-[#8FAD82] text-white rounded-xl hover:bg-[#6B8F5E] transition-colors"
-                >
-                  清潔師後台
-                </Link>
+                {isCleaner ? (
+                  <Link
+                    href="/provider/dashboard"
+                    className="text-sm px-4 py-2 bg-[#8FAD82] text-white rounded-xl hover:bg-[#6B8F5E] transition-colors"
+                  >
+                    清潔師後台
+                  </Link>
+                ) : (
+                  <Link
+                    href="/account/bookings"
+                    className="text-sm text-[#6B7280] hover:text-[#1A1A1A] px-3 py-1.5 hidden sm:inline-flex"
+                  >
+                    我的預約
+                  </Link>
+                )}
               </>
             ) : (
               <>

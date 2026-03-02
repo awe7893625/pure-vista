@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
+import ConfirmBookingButton from './ConfirmBookingButton'
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: '待付款', paid: '已付款', confirmed: '已確認',
@@ -146,12 +147,7 @@ export default async function BookingDetailPage({
 
           {/* Actions */}
           {booking.status === 'completed' && (
-            <div className="pt-2">
-              <button className="w-full py-3 bg-[#8FAD82] text-white rounded-xl font-medium hover:bg-[#6B8F5E] transition-colors">
-                確認驗收完成
-              </button>
-              <p className="text-xs text-[#9CA3AF] text-center mt-2">確認後清潔師將在 14 天後收到款項</p>
-            </div>
+            <ConfirmBookingButton bookingId={booking.id} />
           )}
 
           {booking.status === 'pending_payment' && (

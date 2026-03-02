@@ -13,6 +13,11 @@ export default async function ProviderLayout({ children }: { children: React.Rea
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
+  // Verify user has cleaner role
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile } = await (supabase as any).from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role === 'customer') redirect('/')
+
   const { data: rawCleaner } = await supabase
     .from('cleaners')
     .select('id, display_name, status')
@@ -75,19 +80,7 @@ export default async function ProviderLayout({ children }: { children: React.Rea
 
       {/* Main */}
       <main className="flex-1 ml-56 p-8">
-        {!cleaner ? (
-          <div className="max-w-md mx-auto text-center py-20">
-            <p className="text-4xl mb-4">👋</p>
-            <h2 className="text-xl font-semibold text-[#1A1A1A] mb-2">歡迎加入澄境清潔！</h2>
-            <p className="text-[#6B7280] mb-6">請先完成清潔師資料填寫</p>
-            <Link
-              href="/provider/onboarding"
-              className="inline-flex px-6 py-3 bg-[#8FAD82] text-white rounded-xl text-sm font-medium hover:bg-[#6B8F5E] transition-colors"
-            >
-              開始填寫資料
-            </Link>
-          </div>
-        ) : children}
+        {children}
       </main>
     </div>
   )

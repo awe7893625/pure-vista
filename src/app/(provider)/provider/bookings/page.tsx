@@ -119,6 +119,13 @@ export default async function ProviderBookingsPage() {
                   <p className="text-[#1A1A1A]">{booking.address}</p>
                 </div>
 
+                {customer?.phone && (
+                  <div className="text-sm mb-4">
+                    <p className="text-[#9CA3AF] text-xs">客戶電話</p>
+                    <a href={`tel:${customer.phone}`} className="text-[#8FAD82] hover:underline">{customer.phone}</a>
+                  </div>
+                )}
+
                 {booking.notes && (
                   <p className="text-sm text-[#6B7280] bg-[#F8F9F6] rounded-xl p-3 mb-4">
                     📝 {booking.notes}

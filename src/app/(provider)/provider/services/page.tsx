@@ -70,19 +70,30 @@ export default function ProviderServicesPage() {
   }
 
   async function toggleActive(service: Service) {
+    // Find the category id by matching category name
+    const cat = categories.find(c => c.name === service.category?.name)
     await fetch(`/api/provider/services/${service.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...service, isActive: !service.is_active, categoryId: service.category?.name }),
+      body: JSON.stringify({
+        title: service.title,
+        description: service.description || null,
+        categoryId: cat?.id || null,
+        durationHours: service.duration_hours,
+        pricePerSession: service.price_per_session,
+        isActive: !service.is_active,
+      }),
     })
     loadServices()
   }
 
   function startEdit(service: Service) {
+    // Find category id by name
+    const cat = categories.find(c => c.name === service.category?.name)
     setForm({
       title: service.title,
       description: service.description || '',
-      categoryId: '',
+      categoryId: cat?.id || '',
       durationHours: service.duration_hours,
       pricePerSession: service.price_per_session,
       minAreaSqm: '',
