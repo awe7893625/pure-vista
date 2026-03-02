@@ -73,6 +73,27 @@ export async function POST(request: NextRequest) {
   const endMin = endMinutes % 60
   const scheduledEndTime = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
 
+  // Check cleaner availability rules for this day
+  const bookingDayOfWeek = new Date(scheduledDate + 'T00:00:00Z').getUTCDay() // 0=Sun, 1=Mon...
+  const { data: availRules } = await sb
+    .from('availability_rules')
+    .select('start_time, end_time')
+    .eq('cleaner_id', cleanerId)
+    .eq('day_of_week', bookingDayOfWeek)
+
+  if (!availRules || availRules.length === 0) {
+    return NextResponse.json({ error: '清潔師此日不接單，請選擇其他日期' }, { status: 409 })
+  }
+
+  const avail = availRules[0] as { start_time: string; end_time: string }
+  const availStart = avail.start_time.substring(0, 5)
+  const availEnd = avail.end_time.substring(0, 5)
+  if (scheduledStartTime < availStart || scheduledEndTime > availEnd) {
+    return NextResponse.json({
+      error: `清潔師此日可接單時段為 ${availStart}～${availEnd}，請調整時間`,
+    }, { status: 409 })
+  }
+
   // Check for scheduling conflicts — compare actual time ranges, not just dates
   const { data: rawConflicts } = await sb
     .from('bookings')

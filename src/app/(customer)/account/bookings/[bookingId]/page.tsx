@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import ConfirmBookingButton from './ConfirmBookingButton'
+import CancelBookingButton from './CancelBookingButton'
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: '待付款', paid: '已付款', confirmed: '已確認',
@@ -148,6 +149,10 @@ export default async function BookingDetailPage({
           {/* Actions */}
           {booking.status === 'completed' && (
             <ConfirmBookingButton bookingId={booking.id} />
+          )}
+
+          {['paid', 'confirmed'].includes(booking.status) && (
+            <CancelBookingButton bookingId={booking.id} />
           )}
 
           {booking.status === 'pending_payment' && (
