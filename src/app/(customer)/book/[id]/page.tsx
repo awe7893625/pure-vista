@@ -27,10 +27,10 @@ interface CleanerRow {
 }
 
 export default function BookPage({ params, searchParams }: {
-  params: Promise<{ cleanerId: string }>
+  params: Promise<{ id: string }>
   searchParams: Promise<{ service?: string }>
 }) {
-  const { cleanerId } = use(params)
+  const cleanerId = use(params).id
   const { service: serviceId } = use(searchParams)
 
   const [cleaner, setCleaner] = useState<Cleaner | null>(null)

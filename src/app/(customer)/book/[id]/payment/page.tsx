@@ -10,8 +10,8 @@ interface BookingRow {
   service: { title: string } | null
 }
 
-export default async function PaymentPage({ params }: { params: Promise<{ bookingId: string }> }) {
-  const { bookingId } = await params
+export default async function PaymentPage({ params }: { params: Promise<{ id: string }> }) {
+  const bookingId = (await params).id
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
