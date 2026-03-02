@@ -5,12 +5,20 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get user role to show appropriate nav items
+  // Get user role and unread notification count
   let userRole: string | null = null
+  let unreadCount = 0
   if (user) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profile } = await (supabase as any).from('profiles').select('role').eq('id', user.id).single()
+    const sb = supabase as any
+    const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
     userRole = profile?.role || null
+    const { count } = await sb
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+    unreadCount = count || 0
   }
 
   const isCleaner = userRole === 'cleaner'
@@ -35,6 +43,17 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <div className="flex items-center gap-2">
             {user ? (
               <>
+                {/* Notification Bell */}
+                <Link href="/account/notifications" className="relative p-2 text-[#6B7280] hover:text-[#1A1A1A] transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Link>
                 {isCleaner ? (
                   <Link
                     href="/provider/dashboard"
