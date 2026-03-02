@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyECPayCallback } from '@/lib/ecpay'
 import { createClient } from '@supabase/supabase-js'
+import { sendNewBookingToCleanerEmail } from '@/lib/email'
 
 // ECPay Notify: server-to-server, must use service role (no cookies)
 function createServiceClient() {
@@ -17,12 +18,23 @@ export async function POST(request: NextRequest) {
     params[key] = String(value)
   })
 
+  // Log raw params for audit trail (before signature check)
+  console.log('ECPay notify raw params:', JSON.stringify({
+    MerchantTradeNo: params.MerchantTradeNo,
+    RtnCode: params.RtnCode,
+    RtnMsg: params.RtnMsg,
+    PaymentType: params.PaymentType,
+    TradeAmt: params.TradeAmt,
+    PaymentDate: params.PaymentDate,
+    timestamp: new Date().toISOString(),
+  }))
+
   const hashKey = process.env.ECPAY_HASH_KEY!
   const hashIv = process.env.ECPAY_HASH_IV!
 
   // Verify signature
   if (!verifyECPayCallback(params, hashKey, hashIv)) {
-    console.error('ECPay notify: invalid CheckMacValue')
+    console.error('ECPay notify: invalid CheckMacValue', { MerchantTradeNo: params.MerchantTradeNo })
     return new NextResponse('0|ErrorMacValue', { status: 200 })
   }
 
@@ -102,6 +114,39 @@ export async function POST(request: NextRequest) {
         body: '你有一筆新的清潔預約，請前往後台確認。',
         data: { booking_id: booking.id },
       })
+
+      // Send email to cleaner
+      const { data: fullBooking } = await supabase
+        .from('bookings')
+        .select('scheduled_date, scheduled_start_time, address, total_amount, service:services(title)')
+        .eq('id', booking.id)
+        .single()
+
+      const { data: cleanerProfile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', cleaner.profile_id)
+        .single()
+
+      const { data: customerProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', booking.customer_id)
+        .single()
+
+      if (fullBooking && cleanerProfile?.email && customerProfile) {
+        const svc = fullBooking.service as unknown as { title: string } | null
+        sendNewBookingToCleanerEmail({
+          cleanerEmail: cleanerProfile.email,
+          cleanerName: cleanerProfile.full_name || '清潔師',
+          customerName: customerProfile.full_name || '客戶',
+          serviceTitle: svc?.title || '清潔服務',
+          scheduledDate: new Date(fullBooking.scheduled_date).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }),
+          scheduledStartTime: String(fullBooking.scheduled_start_time).substring(0, 5),
+          address: fullBooking.address,
+          totalAmount: booking.total_amount,
+        }).catch(err => console.error('ECPay notify: email to cleaner failed', err))
+      }
     }
   } else {
     // Payment failed

@@ -37,17 +37,27 @@ export async function POST(
 
   const now = new Date().toISOString()
 
-  await sb
+  const { error: cancelError } = await sb
     .from('bookings')
     .update({ status: 'cancelled', cancelled_at: now, cancellation_reason: '客戶取消' })
     .eq('id', bookingId)
 
+  if (cancelError) {
+    console.error('Cancel booking DB error:', cancelError)
+    return NextResponse.json({ error: '取消失敗，請稍後再試' }, { status: 500 })
+  }
+
   // Mark payment as needing refund
-  await sb
+  const { error: paymentError } = await sb
     .from('payments')
     .update({ status: 'refund_pending' })
     .eq('booking_id', bookingId)
     .eq('status', 'paid')
+
+  if (paymentError) {
+    console.error('Cancel payment update error:', paymentError)
+    // Booking already cancelled — log but don't block response
+  }
 
   await sb.from('booking_status_logs').insert({
     booking_id: bookingId,
@@ -57,13 +67,15 @@ export async function POST(
     notes: '客戶取消，待退款',
   })
 
-  // Notify cleaner
-  await sb.from('notifications').insert({
+  // Notify cleaner (fire-and-forget)
+  sb.from('notifications').insert({
     user_id: booking.cleaner_id,
     type: 'booking_cancelled',
     title: '客戶已取消預約',
     body: '客戶取消了此預約，時段已釋放。',
     data: { booking_id: bookingId },
+  }).then(({ error }: { error: unknown }) => {
+    if (error) console.error('Cancel notification error:', error)
   })
 
   return NextResponse.json({ success: true })

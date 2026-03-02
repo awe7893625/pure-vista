@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendBookingConfirmedToCustomerEmail } from '@/lib/email'
 
 const VALID_PROVIDER_TRANSITIONS: Record<string, string> = {
   paid: 'confirmed',
@@ -113,6 +114,39 @@ export async function PATCH(
       body: '你的預約已被清潔師確認，請準時等候服務。',
       data: { booking_id: bookingId },
     })
+
+    // Send email to customer with cleaner contact info
+    const { data: fullBooking } = await sb
+      .from('bookings')
+      .select('scheduled_date, scheduled_start_time, address, total_amount, service:services(title)')
+      .eq('id', bookingId)
+      .single()
+
+    const { data: customerProfile } = await sb
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', booking.customer_id)
+      .single()
+
+    const { data: cleanerWithProfile } = await sb
+      .from('cleaners')
+      .select('display_name, profile:profiles(email, phone)')
+      .eq('id', cleaner.id)
+      .single()
+
+    if (fullBooking && customerProfile && cleanerWithProfile) {
+      sendBookingConfirmedToCustomerEmail({
+        customerEmail: customerProfile.email,
+        customerName: customerProfile.full_name || '客戶',
+        cleanerName: cleanerWithProfile.display_name,
+        cleanerPhone: cleanerWithProfile.profile?.phone || '（未提供）',
+        serviceTitle: fullBooking.service?.title || '清潔服務',
+        scheduledDate: new Date(fullBooking.scheduled_date).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }),
+        scheduledStartTime: String(fullBooking.scheduled_start_time).substring(0, 5),
+        address: fullBooking.address,
+        totalAmount: fullBooking.total_amount,
+      }).catch(err => console.error('Provider confirm: email to customer failed', err))
+    }
   }
 
   return NextResponse.json({ success: true })

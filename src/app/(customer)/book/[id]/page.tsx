@@ -3,6 +3,7 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import DateTimePicker from '@/components/ui/DateTimePicker'
 
 interface Service {
   id: string
@@ -104,17 +105,6 @@ export default function BookPage({ params, searchParams }: {
     router.push(`/book/${data.bookingId}/payment`)
   }
 
-  // Generate available times
-  const times = Array.from({ length: 12 }, (_, i) => {
-    const hour = i + 8
-    return `${String(hour).padStart(2, '0')}:00`
-  })
-
-  // Min date: tomorrow
-  const minDate = new Date()
-  minDate.setDate(minDate.getDate() + 1)
-  const minDateStr = minDate.toISOString().split('T')[0]
-
   if (!cleaner) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center text-[#9CA3AF]">
@@ -176,33 +166,21 @@ export default function BookPage({ params, searchParams }: {
         {/* Date & Time */}
         <div className="bg-white rounded-2xl border border-[#E8EDE6] p-6">
           <h2 className="font-medium text-[#1A1A1A] mb-4">選擇日期與時間</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-[#6B7280] mb-1.5">服務日期 *</label>
-              <input
-                type="date"
-                value={selectedDate}
-                min={minDateStr}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E8EDE6] focus:outline-none focus:ring-2 focus:ring-[#8FAD82] focus:border-transparent text-[#1A1A1A] bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[#6B7280] mb-1.5">開始時間 *</label>
-              <select
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E8EDE6] focus:outline-none focus:ring-2 focus:ring-[#8FAD82] focus:border-transparent text-[#1A1A1A] bg-white"
-              >
-                <option value="">請選擇</option>
-                {times.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <DateTimePicker
+            cleanerId={cleanerId}
+            serviceDurationHours={selectedService?.duration_hours ?? 2}
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            onSelect={(date, time) => {
+              setSelectedDate(date)
+              setSelectedTime(time)
+            }}
+          />
+          {selectedDate && selectedTime && (
+            <p className="mt-3 text-sm text-[#6B7280]">
+              已選：{selectedDate} {selectedTime}
+            </p>
+          )}
         </div>
 
         {/* Address */}
